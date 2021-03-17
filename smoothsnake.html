@@ -1,0 +1,175 @@
+<html>
+  <body style="background: black;">
+    <canvas id="g" style="width: 100%; height: 100%"></canvas>
+    <script>
+      const SIZE = 40;
+      const BORDER = 10;
+      const DIFFINCR = 10; // entirely coincidental
+
+      function pir(n) { return n*Math.PI; };
+      function lenV2(v) { return Math.sqrt(v[0]*v[0] + v[1]*v[1]); }
+      function lenV2_2(v) { return v[0]*v[0] + v[1]*v[1]; }
+      function normV2(v) { let scale = 1.0 / lenV2(v); return [v[0]*scale, v[1]*scale]; }
+      function addV2(v0,v1) { return [v0[0]+v1[0], v0[1]+v1[1]]; }
+      function subV2(v0,v1) { return [v0[0]-v1[0], v0[1]-v1[1]]; }
+      function mulV2(v0,v1) { return [v0[0]*v1[0], v0[1]*v1[1]]; }
+      function mulV2F(v0,f) { return [v0[0]*f, v0[1]*f]; }
+      function eqV2(v0,v1) { return v0[0] == v1[0] && v0[1] == v1[1]; }
+      function collides(v0,v1,r) { return lenV2_2(subV2(v0,v1)) <= r*r; }
+      function lerp(x,y,a) { return x + ((y-x)*a); }
+      function lerpV2(v0,v1,a) { return [lerp(v0[0],v1[0],a), lerp(v0[1],v1[1],a)]; }
+
+      function draw(g, c, t) {
+        let w = c.canvas.width;
+        let h = c.canvas.height;
+        let a = g.die ? 0 : (t-g.last)/g.diff;
+
+        c.clearRect(0,0,w,h);
+        c.strokeStyle = 'rgb(255,0,0)';
+        c.beginPath();
+        c.strokeRect(BORDER,BORDER,w-(BORDER*2),h-(BORDER*2));
+        c.strokeStyle = 'rgb(0,255,0)';
+
+        for(let i = 0; i < g.s.length; ++i) {
+          if(i == g.head) continue;
+
+          let i2 = (i+1 < g.s.length) ? i+1 : 0;
+          let seg0 = g.s[i];
+          let seg1 = g.s[i2];
+          let v = lerpV2(seg0, seg1, a);
+          c.beginPath();
+          c.arc(v[0], v[1], SIZE/2, 0, pir(2));
+          c.stroke();
+        }
+
+        {
+          let v0 = g.s[g.head];
+          let cv = g.c;
+          let norm = normV2(subV2(cv,v0));
+          let v1 = addV2(v0, mulV2(norm, [SIZE,SIZE]));
+          let v = lerpV2(v0, v1, a);
+          c.beginPath();
+          c.arc(v[0], v[1], SIZE/2, 0, pir(2));
+          c.stroke();
+        }
+
+        c.strokeStyle = 'rgb(0,0,255)';
+        c.beginPath();
+        c.arc(g.c[0], g.c[1], SIZE/2, 0, pir(2));
+        c.stroke();
+
+        c.fillStyle = 'rgb(255,0,0)';
+        c.beginPath();
+        c.arc(g.pellet[0], g.pellet[1], SIZE/2, 0, pir(2));
+        c.fill();
+
+        if(g.die) {
+          let k = SIZE;
+          let x0 = addV2(g.diePos, [-k,-k]);
+          let x1 = addV2(g.diePos, [k,k]);
+          let x2 = addV2(g.diePos, [-k,k]);
+          let x3 = addV2(g.diePos, [k,-k]);
+
+          c.strokeStyle = 'rgb(255,0,0)';
+          c.beginPath();
+          c.moveTo(x0[0], x0[1]);
+          c.lineTo(x1[0], x1[1]);
+          c.stroke();
+          c.beginPath();
+          c.moveTo(x2[0],x2[1]);
+          c.lineTo(x3[0],x3[1]);
+          c.stroke();
+        }
+      }
+
+      function genpellet(c) {
+        let w = c.canvas.width;
+        let h = c.canvas.height;
+        let k = 50;
+
+        return [Math.min(w-k, Math.max(k, Math.random() * w)),
+                Math.min(h-k, Math.max(k, Math.random() * h))];
+      }
+
+      function die(g, pos) {
+        g.die = true;
+        g.diePos = pos;
+      }
+
+      function step(g, c, t) {
+        if(g.die) return;
+
+        if(t - g.last >= g.diff) {
+          g.last = t;
+
+          let v0 = g.c;
+          let v1 = g.s[g.head];
+
+          if(eqV2(v0,v1)) {
+            die(g,v0);
+          }
+
+          let dist = subV2(v0,v1);
+          let norm = normV2(dist);
+          let newv = addV2(g.s[g.head], mulV2(norm, [SIZE,SIZE]));
+          let w = c.canvas.width;
+          let h = c.canvas.height;
+
+          let aB = BORDER + (SIZE/2);
+          if(newv[0] < aB || newv[0] >= w-aB)
+            die(g, newv);
+          else if(newv[1] < aB || newv[1] >= h-aB)
+            die(g, newv);
+          else if(g.s.length > 1) {
+            for(let b of g.s) {
+              if(collides(newv, b, SIZE * 0.75)) {
+                let p = addV2(b,mulV2F(subV2(newv,b),0.5));
+                die(g,p);
+                break;
+              }
+            }
+          }
+
+          ++g.head;
+          if(collides(newv, g.pellet, SIZE)) {
+            g.s.splice(g.head, 0, newv);
+            g.pellet = genpellet(c);
+            g.diff -= DIFFINCR;
+            if(g.diff <= 5) g.diff = 5;
+          } else {
+            if(g.head >= g.s.length) g.head = 0;
+            g.s[g.head] = newv;
+          }
+        }
+      }
+
+      function init() {
+        let game = { c: [0,0], s: [[0,0]], head: 0, last: 0, diff: 150 };
+        let canvas = document.getElementById('g');
+        let c = canvas.getContext('2d');
+
+        function onResize() {
+          c.canvas.width = window.innerWidth;
+          c.canvas.height = window.innerHeight;
+        }
+        onResize();
+
+        game.s[0] = [c.canvas.width/8, c.canvas.height/8];
+        game.pellet = [c.canvas.width/2, c.canvas.height/2];
+
+        window.addEventListener('resize', onResize, false);
+        window.addEventListener('mousemove', e => {
+          game.c = [Math.floor(e.pageX - window.pageXOffset), Math.floor(e.pageY - window.pageYOffset)];
+        });
+
+        let begin = Date.now()
+        setInterval(() => {
+          let t = Date.now() - begin;
+          step(game, c, t);
+          draw(game, c, t);
+        }, 16.6666666666*2);
+      }
+
+      document.addEventListener('DOMContentLoaded', () => init());
+    </script>
+  </body>
