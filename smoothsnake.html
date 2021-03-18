@@ -1,34 +1,22 @@
 <html>
   <body style="background: black;">
     <canvas id="g" style="width: 100%; height: 100%"></canvas>
-    <script>
+    <script type="module">
+      import { pir, V2, Rect, Better2D } from './g.mjs';
+
       const SIZE = 40;
       const BORDER = 10;
       const DIFFINCR = 10; // entirely coincidental
-
-      function pir(n) { return n*Math.PI; };
-      function lenV2(v) { return Math.sqrt(v[0]*v[0] + v[1]*v[1]); }
-      function lenV2_2(v) { return v[0]*v[0] + v[1]*v[1]; }
-      function normV2(v) { let scale = 1.0 / lenV2(v); return [v[0]*scale, v[1]*scale]; }
-      function addV2(v0,v1) { return [v0[0]+v1[0], v0[1]+v1[1]]; }
-      function subV2(v0,v1) { return [v0[0]-v1[0], v0[1]-v1[1]]; }
-      function mulV2(v0,v1) { return [v0[0]*v1[0], v0[1]*v1[1]]; }
-      function mulV2F(v0,f) { return [v0[0]*f, v0[1]*f]; }
-      function eqV2(v0,v1) { return v0[0] == v1[0] && v0[1] == v1[1]; }
-      function collides(v0,v1,r) { return lenV2_2(subV2(v0,v1)) <= r*r; }
-      function lerp(x,y,a) { return x + ((y-x)*a); }
-      function lerpV2(v0,v1,a) { return [lerp(v0[0],v1[0],a), lerp(v0[1],v1[1],a)]; }
+      const NOLERP = false;
 
       function draw(g, c, t) {
-        let w = c.canvas.width;
-        let h = c.canvas.height;
+        let size = V2(c.canvas.width,c.canvas.height);
         let a = g.die ? 0 : (t-g.last)/g.diff;
 
-        c.clearRect(0,0,w,h);
-        c.strokeStyle = 'rgb(255,0,0)';
-        c.beginPath();
-        c.strokeRect(BORDER,BORDER,w-(BORDER*2),h-(BORDER*2));
-        c.strokeStyle = 'rgb(0,255,0)';
+        c.clearRect(Rect(size))
+         .beginPath().setStrokeStyle('rgb(255,0,0)')
+         .strokeRect(Rect(V2(BORDER,BORDER),size.subf(BORDER*2)))
+         .setStrokeStyle('rgb(0,255,0)');
 
         for(let i = 0; i < g.s.length; ++i) {
           if(i == g.head) continue;
@@ -36,49 +24,33 @@
           let i2 = (i+1 < g.s.length) ? i+1 : 0;
           let seg0 = g.s[i];
           let seg1 = g.s[i2];
-          let v = lerpV2(seg0, seg1, a);
-          c.beginPath();
-          c.arc(v[0], v[1], SIZE/2, 0, pir(2));
-          c.stroke();
+          let v = NOLERP ? seg0 : seg0.lerp(seg1, a);
+          c.beginPath().arc(v, SIZE/2, 0, pir(2)).stroke();
         }
 
         {
           let v0 = g.s[g.head];
           let cv = g.c;
-          let norm = normV2(subV2(cv,v0));
-          let v1 = addV2(v0, mulV2(norm, [SIZE,SIZE]));
-          let v = lerpV2(v0, v1, a);
-          c.beginPath();
-          c.arc(v[0], v[1], SIZE/2, 0, pir(2));
-          c.stroke();
+          let norm = cv.sub(v0).normalized();
+          let v1 = norm.mulf(SIZE).add(v0);
+          let v = NOLERP ? v0 : v0.lerp(v1, a);
+          c.beginPath().arc(v, SIZE/2, 0, pir(2)).stroke();
         }
 
-        c.strokeStyle = 'rgb(0,0,255)';
-        c.beginPath();
-        c.arc(g.c[0], g.c[1], SIZE/2, 0, pir(2));
-        c.stroke();
-
-        c.fillStyle = 'rgb(255,0,0)';
-        c.beginPath();
-        c.arc(g.pellet[0], g.pellet[1], SIZE/2, 0, pir(2));
-        c.fill();
+        c.beginPath().setStrokeStyle('rgb(0,0,255)').arc(g.c, SIZE/2, 0, pir(2)).stroke();
+        c.beginPath().setFillStyle('rgb(255,0,0)').arc(g.pellet, SIZE/2, 0, pir(2)).fill();
 
         if(g.die) {
           let k = SIZE;
-          let x0 = addV2(g.diePos, [-k,-k]);
-          let x1 = addV2(g.diePos, [k,k]);
-          let x2 = addV2(g.diePos, [-k,k]);
-          let x3 = addV2(g.diePos, [k,-k]);
+          let x0 = g.diePos.addf(-k);
+          let x1 = g.diePos.addf(k);
+          let x2 = g.diePos.add(V2(-k,k));
+          let x3 = g.diePos.add(V2(k,-k));
 
-          c.strokeStyle = 'rgb(255,0,0)';
-          c.beginPath();
-          c.moveTo(x0[0], x0[1]);
-          c.lineTo(x1[0], x1[1]);
-          c.stroke();
-          c.beginPath();
-          c.moveTo(x2[0],x2[1]);
-          c.lineTo(x3[0],x3[1]);
-          c.stroke();
+          c
+          c.setStrokeStyle('rgb(255,0,0)')
+           .beginPath().moveTo(x0).lineTo(x1).stroke()
+           .beginPath().moveTo(x2).lineTo(x3).stroke();
         }
       }
 
@@ -87,8 +59,8 @@
         let h = c.canvas.height;
         let k = 50;
 
-        return [Math.min(w-k, Math.max(k, Math.random() * w)),
-                Math.min(h-k, Math.max(k, Math.random() * h))];
+        return V2(Math.min(w-k, Math.max(k, Math.random() * w)),
+                  Math.min(h-k, Math.max(k, Math.random() * h)));
       }
 
       function die(g, pos) {
@@ -105,25 +77,25 @@
           let v0 = g.c;
           let v1 = g.s[g.head];
 
-          if(eqV2(v0,v1)) {
+          if(v0.eql(v1)) {
             die(g,v0);
           }
 
-          let dist = subV2(v0,v1);
-          let norm = normV2(dist);
-          let newv = addV2(g.s[g.head], mulV2(norm, [SIZE,SIZE]));
+          let dist = v0.sub(v1);
+          let norm = dist.normalized();
+          let newv = norm.mulf(SIZE).add(g.s[g.head]);
           let w = c.canvas.width;
           let h = c.canvas.height;
 
           let aB = BORDER + (SIZE/2);
-          if(newv[0] < aB || newv[0] >= w-aB)
+          if(newv.x < aB || newv.x >= w-aB)
             die(g, newv);
-          else if(newv[1] < aB || newv[1] >= h-aB)
+          else if(newv.y < aB || newv.y >= h-aB)
             die(g, newv);
           else if(g.s.length > 1) {
             for(let b of g.s) {
-              if(collides(newv, b, SIZE * 0.75)) {
-                let p = addV2(b,mulV2F(subV2(newv,b),0.5));
+              if(newv.within(b, SIZE * 0.75)) {
+                let p = b.sub(newv).mulf(0.5).add(b);
                 die(g,p);
                 break;
               }
@@ -131,7 +103,7 @@
           }
 
           ++g.head;
-          if(collides(newv, g.pellet, SIZE)) {
+          if(newv.within(g.pellet, SIZE)) {
             g.s.splice(g.head, 0, newv);
             g.pellet = genpellet(c);
             g.diff -= DIFFINCR;
@@ -144,9 +116,9 @@
       }
 
       function init() {
-        let game = { c: [0,0], s: [[0,0]], head: 0, last: 0, diff: 150 };
+        let game = { c: V2(0,0), s: [V2(0,0)], head: 0, last: 0, diff: 150 };
         let canvas = document.getElementById('g');
-        let c = canvas.getContext('2d');
+        let c = new Better2D(canvas.getContext('2d'));
 
         function onResize() {
           c.canvas.width = window.innerWidth;
@@ -154,12 +126,12 @@
         }
         onResize();
 
-        game.s[0] = [c.canvas.width/8, c.canvas.height/8];
-        game.pellet = [c.canvas.width/2, c.canvas.height/2];
+        game.s[0] = V2(c.canvas.width/8, c.canvas.height/8);
+        game.pellet = V2(c.canvas.width/2, c.canvas.height/2);
 
         window.addEventListener('resize', onResize, false);
         window.addEventListener('mousemove', e => {
-          game.c = [Math.floor(e.pageX - window.pageXOffset), Math.floor(e.pageY - window.pageYOffset)];
+          game.c = V2(Math.floor(e.pageX - window.pageXOffset), Math.floor(e.pageY - window.pageYOffset));
         });
 
         let begin = Date.now()
