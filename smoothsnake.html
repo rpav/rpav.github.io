@@ -131,9 +131,8 @@
         game.pellet = V2(c.canvas.width/2, c.canvas.height/2);
 
         window.addEventListener('resize', onResize, false);
-        window.addEventListener('mousemove', e => {
-          game.c = V2(Math.floor(e.pageX - window.pageXOffset), Math.floor(e.pageY - window.pageYOffset));
-        });
+        window.addEventListener('mousemove', e => { game.c = V2(Math.floor(e.pageX), Math.floor(e.pageY)); });
+        window.addEventListener('touchmove', e => { game.c = V2(e.touches[0].pageX, e.touches[0].pageY); });
 
         let begin = Date.now()
         setInterval(() => {
